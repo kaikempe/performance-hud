@@ -1,0 +1,11 @@
+# SwiftPM build products
+.build/
+Package.resolved
+
+# The app bundle is a build artifact of build-app.sh
+PerformanceHUD.app/
+
+# Local, machine-specific tool settings
+.claude/settings.local.json
+
+.DS_Store
