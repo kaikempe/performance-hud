@@ -83,13 +83,14 @@ nothing in the OS is in a position to read it. And writing `_HIHideMenuBar`
 changes behaviour live: the strip `NSScreen` reserves at the top of the display
 moved 39 → 38 → 39 pt within 2.5 s of the write, with no relaunch.
 
-That 1 pt is the honest caveat. On a notched display the notch stays reserved
+That 1 pt has an explanation. On a notched display the notch stays reserved
 whether the bar is showing or not (`safeAreaInsets.top` is 38 pt against a 39 pt
 menu bar), so auto-hiding only ever reclaims the 1 pt below it. The same notch
-makes the *full-screen* half unobservable from code on this machine — window
-height is capped at `frame.height - 39` either way — so the full-screen result is
-inferred from the desktop half sharing its domain, its reader, and its
-notification, not measured directly.
+defeats the obvious test of the *full-screen* half from code: window height is
+capped at `frame.height - 39` either way, and each Space carries its own
+`Menubar` window, so neither geometry nor `CGWindowListCopyWindowInfo` can tell
+the two states apart. Confirmed by eye instead — toggle on, full-screen a
+window, the bar goes. macOS 26.5.2, M-series MacBook Pro with notch.
 
 ## Fan control
 
