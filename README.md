@@ -23,6 +23,41 @@ For development, `swift build && ./.build/debug/PerformanceHUD` also works.
 To **launch at login**: System Settings → General → Login Items → add
 `PerformanceHUD.app`.
 
+## Giving it to someone else
+
+Send the **source**, not the built app — have them run `./build-app.sh` on their own
+machine. That is the path that just works, because the bundle here is *ad-hoc* signed
+(`codesign --sign -`): valid, but tied to no Apple Developer identity and not
+notarized. `spctl -a PerformanceHUD.app` reports `rejected`, and macOS enforces that
+on any copy that arrives with a quarantine flag — which AirDrop, Mail, Slack, and
+every browser download set. Building locally never sets that flag, so the app opens
+with no dialog at all.
+
+They need an **Apple Silicon** Mac on **macOS 14+** and the Xcode Command Line Tools
+(`xcode-select --install`); the build itself takes a few seconds. Nothing else is
+granted or prompted for — the sensors are read through IOKit, which needs no TCC
+permission.
+
+Don't zip the working directory as-is. `.build/` is ~500 MB of SwiftPM object files
+and `PerformanceHUD.app/` is a build artifact; both are gitignored. Send the repo:
+
+```bash
+git clone <this repo> performance-hud     # or:
+git archive --format=zip -o ~/performance-hud.zip HEAD
+```
+
+If you'd rather send the built `.app` anyway, it will be blocked on first launch and
+they have to clear it manually — Control-click → Open no longer bypasses Gatekeeper
+on macOS 15+, so it's System Settings → Privacy & Security → **Open Anyway** after
+the first failed attempt. Stripping the flag up front avoids the dialog entirely:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/PerformanceHUD.app
+```
+
+Asking someone to run `xattr` on a binary they can't inspect is a lot to ask, which
+is the other reason to send source.
+
 ## Two kinds of overlay
 
 **1. Apple's Metal HUD** — the free, built-in overlay from the screenshots. Toggled
@@ -311,6 +346,7 @@ than guessed. Run it before and after touching anything in `Sensors/` or
 ## Project layout
 
 ```
+Tools/make-icon.swift   draws Resources/AppIcon.icns (run: swift Tools/make-icon.swift)
 Sources/SensorBridge/   Objective-C: IOHID temps + SMC fan RPM & watts (private-but-stable SPI)
 Sources/PerformanceHUD/
   App/                  entry point, --dump-sensors and --bench modes

@@ -9,3 +9,6 @@ PerformanceHUD.app/
 .claude/settings.local.json
 
 .DS_Store
+
+# Intermediate output of Tools/make-icon.swift; AppIcon.icns is the committed artifact
+Resources/AppIcon.iconset/
