@@ -12,6 +12,7 @@ struct PerformanceHUDApp: App {
     @State private var hud = MetalHUDController()
     @State private var overlay: OverlayController
     @State private var menuBarVisibility = MenuBarVisibilityController()
+    @State private var loginItem = LoginItemController()
 
     init() {
         let monitor = SystemMonitor()
@@ -22,7 +23,7 @@ struct PerformanceHUDApp: App {
     var body: some Scene {
         MenuBarExtra {
             StatsPanelView(monitor: monitor, hud: hud, overlay: overlay,
-                           menuBarVisibility: menuBarVisibility)
+                           menuBarVisibility: menuBarVisibility, loginItem: loginItem)
         } label: {
             MenuBarLabel(menuBar: monitor.menuBar)
         }
