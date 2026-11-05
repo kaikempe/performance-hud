@@ -28,6 +28,7 @@ struct StatsPanelView: View {
     @ObservedObject var hud: MetalHUDController
     @ObservedObject var overlay: OverlayController
     @ObservedObject var menuBarVisibility: MenuBarVisibilityController
+    @ObservedObject var loginItem: LoginItemController
 
     @StateObject private var refresh = PanelRefresh()
 
@@ -77,6 +78,10 @@ struct StatsPanelView: View {
             Divider()
 
             fullScreenMenuBarSection
+
+            Divider()
+
+            loginItemSection
 
             Divider()
 
@@ -631,6 +636,27 @@ struct StatsPanelView: View {
             Text("Applies the next time a window enters full screen.")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
+        }
+    }
+
+    /// Starts the app at every login, and so after a restart too.
+    private var loginItemSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Toggle(isOn: Binding(
+                get: { loginItem.isEnabled },
+                set: { loginItem.setEnabled($0) }
+            )) {
+                Text("Launch at login").font(.system(size: 12, weight: .medium))
+            }
+            .toggleStyle(.switch)
+            .disabled(!loginItem.isAvailable)
+            // System Settings may have changed it since the panel last opened.
+            .onAppear { loginItem.refresh() }
+
+            Text(loginItem.problem ?? "Starts automatically after you log in or restart.")
+                .font(.caption2)
+                .foregroundStyle(loginItem.problem == nil ? AnyShapeStyle(.secondary)
+                                                          : AnyShapeStyle(Color.orange))
         }
     }
 

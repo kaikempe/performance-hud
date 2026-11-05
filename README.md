@@ -20,8 +20,24 @@ open PerformanceHUD.app # look for the live readout in the menu bar (top-right)
 
 For development, `swift build && ./.build/debug/PerformanceHUD` also works.
 
-To **launch at login**: System Settings → General → Login Items → add
-`PerformanceHUD.app`.
+## Launch at login
+
+Turn on **Launch at login** in the panel. It registers the bundle with macOS's
+Login Items through `SMAppService`, so the app starts on every login — including
+the one after a restart — and shows up under System Settings → General → Login
+Items, where it can also be switched off.
+
+The same switch from a script or a fresh build:
+
+```bash
+./PerformanceHUD.app/Contents/MacOS/PerformanceHUD --login-item on      # or off, status
+```
+
+Two things to know about how the registration is stored. It records the bundle's
+**path**, so it keeps working across `./build-app.sh` rebuilds in place, but moving
+or renaming this directory leaves a dead entry — toggle it off before moving and on
+again afterwards. And it needs a real bundle: the toggle is disabled when running
+the bare `swift build` binary, which has no `.app` around it to register.
 
 ## Giving it to someone else
 
