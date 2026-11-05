@@ -359,3 +359,7 @@ Sources/PerformanceHUD/
 `SystemMonitor` is the poller, and `SensorDemand` next to it is where the polling
 rates live — if you add a reader, decide there which parts of the UI justify its
 cost rather than adding it to every tick.
+
+## License
+
+MIT, see [`LICENSE`](LICENSE).
