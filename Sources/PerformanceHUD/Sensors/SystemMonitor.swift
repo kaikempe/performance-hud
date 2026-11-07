@@ -74,16 +74,7 @@ final class SystemMonitor: ObservableObject {
     @Published private(set) var tempHistory: [Double] = []
     @Published private(set) var powerHistory: [Double] = []
 
-    private let cpuReader = CPUUsage()
-    private let gpuReader = GPUUsage()
-    private let memReader = MemoryUsage()
-    private let netReader = NetworkUsage()
-    private let thermalReader = ThermalSensors()
-    private let powerReader = PowerUsage()
-    private let diskReader = DiskUsage()
-    private let batteryReader = BatteryUsage()
-    private let clockReader = ClockUsage()
-    private let processReader = ProcessUsage()
+    private let sensors: SensorSet
     private let throttleDetector = ThrottleDetector()
 
     /// Drives the menu-bar label. Kept separate from this object's own published
@@ -130,7 +121,11 @@ final class SystemMonitor: ObservableObject {
         batterySaver && onBattery ? interval * 2 : interval
     }
 
-    init() {
+    /// `autoStart: false` is for tests: no timer, no `UserDefaults` observer, and
+    /// the caller drives `tick(now:)` itself.
+    init(sensors: SensorSet = .live(), autoStart: Bool = true) {
+        self.sensors = sensors
+        guard autoStart else { return }
         loadSettings()
         // The monitor lives as long as the app, so this observer is never removed.
         NotificationCenter.default.addObserver(
@@ -158,14 +153,15 @@ final class SystemMonitor: ObservableObject {
     func start() {
         stop()
         // Prime delta-based readers so the first visible tick is meaningful.
-        _ = cpuReader.sample()
-        _ = netReader.sample()
-        _ = diskReader.sample()
-        _ = clockReader.sample()
-        _ = processReader.sample()
+        let primedAt = Date()
+        _ = sensors.cpu.sample()
+        _ = sensors.network.sample(now: primedAt)
+        _ = sensors.disk.sample(now: primedAt)
+        _ = sensors.clocks.sample()
+        _ = sensors.processes.sample(count: 5, now: primedAt)
 
         // Read before scheduling: the power source decides the rate below.
-        battery = batteryReader.sample()
+        battery = sensors.battery.sample()
         wasOnBattery = onBattery
 
         let t = Timer(timeInterval: effectiveInterval, repeats: true) { [weak self] _ in
@@ -205,25 +201,25 @@ final class SystemMonitor: ObservableObject {
         tick()
     }
 
-    private func tick() {
-        let now = Date()
+    /// One sampling pass. Internal, with an injectable clock, so tests can step it.
+    func tick(now: Date = Date()) {
         let demand = self.demand
 
         // The cheap readers — a millisecond between the lot of them.
-        cpu = cpuReader.sample()
-        gpuDetail = gpuReader.sample()
+        cpu = sensors.cpu.sample()
+        gpuDetail = sensors.gpu.sample()
         gpu = gpuDetail.utilization
-        memory = memReader.sample()
-        network = netReader.sample()
-        disk = diskReader.sample()
-        battery = batteryReader.sample()
+        memory = sensors.memory.sample()
+        network = sensors.network.sample(now: now)
+        disk = sensors.disk.sample(now: now)
+        battery = sensors.battery.sample()
         thermalPressure = ProcessInfo.processInfo.thermalState
 
         // The expensive ones, at whatever rate the visible UI justifies. The 10%
         // slack keeps a sweep from being pushed a whole period late by timer
         // jitter when the deadline lands just short.
         if now.timeIntervalSince(lastThermalSample) >= demand.thermalInterval * 0.9 {
-            thermal = thermalReader.sample()
+            thermal = sensors.thermal.sample()
             lastThermalSample = now
         }
         // Watts reach the screen only in the panel or the optional menu-bar
@@ -236,7 +232,7 @@ final class SystemMonitor: ObservableObject {
         var sampledPower = false
         if wantsPower, now.timeIntervalSince(lastPowerSample) >= demand.powerInterval * 0.9 {
             let gap = now.timeIntervalSince(lastPowerSample)
-            let sample = powerReader.sample()
+            let sample = sensors.power.sample()
             // The per-block figures are an energy delta since the previous call,
             // so the first read after a pause describes the whole gap. The SMC
             // rails are instantaneous and stay valid — and they are what the
@@ -248,7 +244,7 @@ final class SystemMonitor: ObservableObject {
             sampledPower = true
         }
         if demand.samplesClocks {
-            let clocks = clockReader.sample()
+            let clocks = sensors.clocks.sample()
             // Residency is a delta, so the first read after a pause describes the
             // whole gap — how the machine clocked while nobody was watching.
             // Treat it as the prime and publish from the next one on.
@@ -263,11 +259,11 @@ final class SystemMonitor: ObservableObject {
             gpuClock = nil
         }
         if demand.samplesProcesses {
-            topProcesses = processReader.sample(now: now)
+            topProcesses = sensors.processes.sample(count: 5, now: now)
         }
 
         // Utilization of whichever engine is working hardest.
-        throttleDetector.update(load: max(cpu, gpuDetail.utilization), watts: power.systemWatts)
+        throttleDetector.update(load: max(cpu, gpuDetail.utilization), watts: power.systemWatts, now: now)
         isPowerLimited = throttleDetector.isPowerLimited
         powerPeakWatts = throttleDetector.peakWatts
 

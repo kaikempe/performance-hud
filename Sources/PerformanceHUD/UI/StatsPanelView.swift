@@ -55,13 +55,18 @@ struct StatsPanelView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Performance HUD")
-                .font(.system(size: 13, weight: .semibold))
+                .font(.system(size: 14, weight: .semibold))
+                .tracking(-0.1)
 
             Divider()
 
             // Above the sections below it, so the power hover card floats over
             // them instead of being painted over by later siblings.
             metrics.zIndex(1)
+
+            Divider()
+
+            suggestionsSection
 
             Divider()
 
@@ -559,6 +564,13 @@ struct StatsPanelView: View {
         }
     }
 
+    private var suggestionsSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Suggestions").font(.system(size: 12, weight: .medium))
+            ForEach(SuggestionEngine.suggestions(for: monitor)) { SuggestionRow(suggestion: $0) }
+        }
+    }
+
     private var overlaySection: some View {
         VStack(alignment: .leading, spacing: 6) {
             Toggle(isOn: Binding(
@@ -754,11 +766,9 @@ struct StatRow: View {
 extension View {
     func detailCardChrome() -> some View {
         self
-            .padding(9)
+            .padding(10)
             .frame(width: 244, alignment: .leading)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
-            .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(.quaternary))
-            .shadow(radius: 8, y: 2)
+            .floatingCardSurface(cornerRadius: 12)
     }
 
     /// Floats `card` just below this view while the pointer is over it. The card
@@ -780,6 +790,12 @@ private struct HoverCardModifier<Card: View>: ViewModifier {
     @ViewBuilder let card: () -> Card
 
     @State private var rowHeight: CGFloat = 0
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    /// The card hangs just below the row, so it scales from its top edge.
+    private var anchorPoint: UnitPoint {
+        alignment == .topTrailing ? .topTrailing : .topLeading
+    }
 
     func body(content: Content) -> some View {
         content
@@ -796,10 +812,15 @@ private struct HoverCardModifier<Card: View>: ViewModifier {
                     card()
                         .offset(y: rowHeight + 4)
                         .allowsHitTesting(false)
-                        .transition(.opacity)
+                        // Grows out of the row it belongs to, and leaves the same
+                        // way. Cross-fade only under Reduce Motion.
+                        .transition(reduceMotion
+                                    ? .opacity
+                                    : .scale(scale: 0.96, anchor: anchorPoint).combined(with: .opacity))
                         .zIndex(1)
                 }
             }
-            .animation(.easeOut(duration: 0.12), value: isShown)
+            // Critically damped: it can be interrupted mid-flight without bounce.
+            .animation(.spring(response: 0.28, dampingFraction: 1), value: isShown)
     }
 }

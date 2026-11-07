@@ -26,5 +26,9 @@ let package = Package(
                 .linkedFramework("IOKit"),
             ]
         ),
+        .testTarget(
+            name: "PerformanceHUDTests",
+            dependencies: ["PerformanceHUD"]
+        ),
     ]
 )
