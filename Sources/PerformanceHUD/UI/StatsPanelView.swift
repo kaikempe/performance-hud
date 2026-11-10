@@ -52,7 +52,44 @@ struct StatsPanelView: View {
     @State private var showProcessDetail = false
     @State private var showBatteryDetail = false
 
+    /// Natural height of the panel content, measured so the scroll view can
+    /// shrink to fit when there is room and scroll when there isn't.
+    @State private var contentHeight: CGFloat = 0
+
+    /// Tallest the panel may be: the visible screen minus room for the menu bar
+    /// and a margin, so it never runs off the bottom on a small display.
+    private var maxPanelHeight: CGFloat {
+        let screen = NSScreen.main?.visibleFrame.height ?? 800
+        return max(240, screen - 24)
+    }
+
     var body: some View {
+        ScrollView(.vertical, showsIndicators: true) {
+            panelContent
+                .background(
+                    GeometryReader { geo in
+                        Color.clear.onChange(of: geo.size.height, initial: true) { _, h in
+                            contentHeight = h
+                        }
+                    }
+                )
+        }
+        .scrollBounceBehavior(.basedOnSize)
+        .frame(width: 300)
+        .frame(height: contentHeight > 0 ? min(contentHeight, maxPanelHeight) : nil)
+        // Everything in here reads the expensive sensors, and redrawing it is
+        // expensive in its own right. Both stop while the panel is closed.
+        .onAppear {
+            refresh.setActive(true, monitor: monitor)
+            monitor.setPanelVisible(true)
+        }
+        .onDisappear {
+            refresh.setActive(false, monitor: monitor)
+            monitor.setPanelVisible(false)
+        }
+    }
+
+    private var panelContent: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Performance HUD")
                 .font(.system(size: 14, weight: .semibold))
@@ -106,16 +143,6 @@ struct StatsPanelView: View {
         }
         .padding(14)
         .frame(width: 300)
-        // Everything in here reads the expensive sensors, and redrawing it is
-        // expensive in its own right. Both stop while the panel is closed.
-        .onAppear {
-            refresh.setActive(true, monitor: monitor)
-            monitor.setPanelVisible(true)
-        }
-        .onDisappear {
-            refresh.setActive(false, monitor: monitor)
-            monitor.setPanelVisible(false)
-        }
     }
 
     private var metrics: some View {
